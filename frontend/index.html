@@ -1,0 +1,71 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Store | Home</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="home">
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="index.html">My Store</a>
+      <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">Menu</button>
+      <nav class="nav-links" id="nav-links">
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="admin.html">Admin</a>
+        <a href="login.html">Login</a>
+      </nav>
+      <div class="nav-actions">
+        <div id="nav-user" class="nav-user"></div>
+        <a class="cart-link" href="cart.html">Cart <span id="cart-count">0</span></a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <p class="tag">Fresh Collection</p>
+          <h1>Simple shopping with a modern, production-ready store.</h1>
+          <p>Browse products, add to cart, and place real orders through secure backend APIs.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="products.html">Shop Now</a>
+            <a class="btn btn-light" href="admin.html">Manage Products</a>
+          </div>
+        </div>
+        <div class="hero-card">
+          <h3>Why My Store?</h3>
+          <ul>
+            <li>Responsive storefront</li>
+            <li>Search and category filters</li>
+            <li>Live product and order APIs</li>
+            <li>Admin CRUD panel</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <h2>Featured Products</h2>
+          <a href="products.html" class="text-link">View all</a>
+        </div>
+        <div id="featured-products" class="products-grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>My Store powered by HTML, CSS, JavaScript, Node.js, and Cashfree Payments.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: simple-store-cashfree-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: CASHFREE_APP_ID
+        sync: false
+      - key: CASHFREE_SECRET_KEY
+        sync: false
+      - key: CASHFREE_ENV
+        value: sandbox
+      - key: PORT
+        value: 5000
+      - key: CLIENT_URL
+        sync: false
