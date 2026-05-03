@@ -1,32 +1,48 @@
-# Simple Store with Cashfree
+# Podsecntra Store (Cashfree + Supabase)
 
-Simple e-commerce storefront using:
+Podsecntra is a simple multi-page e-commerce store with:
 
-- `localStorage` for products, cart, users, and order history
-- Node.js + Express backend only for Cashfree order create/verify
+- static frontend in `docs/` (HTML/CSS/JS)
+- Node.js backend in `backend/`
+- Cashfree payment flow
+- Supabase-backed products, cart sessions, abandoned-cart tracking, and orders
+- separate admin dashboard (`docs/admin-dashboard.html`)
 
-No Supabase. No MongoDB. No UI rebuild.
+No MongoDB. No Razorpay.
 
 ## Project Structure
 
-- `docs/` static multi-page store
-- `backend/` Cashfree API backend
-- `render.yaml` backend deployment blueprint
-- `netlify.toml` frontend deployment config
+- `docs/` store frontend + admin dashboard
+- `backend/` Express API + Cashfree integration
+- `backend/supabase-schema.sql` Supabase table schema
+- `render.yaml` Render service blueprint
+- `netlify.toml` Netlify publish config (if needed)
 
-## Environment Files
+## Required Backend Environment
 
-`backend/.env` should remain local only and is gitignored.
-
-Use `backend/.env.example` as the template:
+Use `backend/.env.example`:
 
 ```env
 PORT=5000
-CLIENT_URL=http://localhost:5500,http://127.0.0.1:5500
+CLIENT_URL=http://localhost:5500,http://127.0.0.1:5500,https://webappdevitsolutions.github.io,https://podscentra.store
+
 CASHFREE_APP_ID=your_cashfree_app_id
 CASHFREE_SECRET_KEY=your_cashfree_secret_key
 CASHFREE_ENV=sandbox
+
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+ADMIN_EMAIL=admin@podsecntra.com
+ADMIN_PASSWORD=change_this_admin_password
+ADMIN_JWT_SECRET=change_this_admin_jwt_secret
 ```
+
+## Supabase Setup
+
+1. Open Supabase SQL Editor.
+2. Run `backend/supabase-schema.sql`.
+3. Copy `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` into backend env.
 
 ## Local Run
 
@@ -38,7 +54,7 @@ npm.cmd install
 npm.cmd start
 ```
 
-Health check:
+Health:
 
 ```txt
 http://localhost:5000/api/health
@@ -57,44 +73,78 @@ Open:
 http://localhost:5500/index.html
 ```
 
-## Deploy Backend to Render
-
-1. Push this repo to GitHub.
-2. In Render, create a new Blueprint/Web Service from this repo.
-3. Ensure service uses `backend` root directory (`render.yaml` already sets this).
-4. Set env vars in Render:
-
-```env
-CASHFREE_APP_ID=your_real_app_id
-CASHFREE_SECRET_KEY=your_real_secret_key
-CASHFREE_ENV=sandbox
-PORT=5000
-CLIENT_URL=https://your-netlify-site.netlify.app
-```
-
-5. Deploy and verify:
+Admin dashboard:
 
 ```txt
-https://your-render-backend.onrender.com/api/health
+http://localhost:5500/admin-dashboard.html
 ```
 
-## Deploy Frontend to Netlify
+## Render Deploy (Backend)
 
-1. Create Netlify site from this same repo.
-2. Publish directory should be `docs` (`netlify.toml` already sets this).
-3. After Render deploy, update:
+- Root Directory: `backend`
+- Build Command: `npm install`
+- Start Command: `npm run start`
 
-- `docs/script.js` default production API URL placeholder
-- `netlify.toml` redirect target URL placeholder
+Set env vars in Render from `.env.example`.
 
-to your real Render URL, then redeploy Netlify.
+## GitHub Pages / Custom Domain (Frontend)
 
-## Payment Flow
+Frontend is static in `docs/` and works with GitHub Pages.
 
-1. Add items to cart
-2. Go to checkout
-3. Submit checkout form
-4. Cashfree hosted checkout opens
-5. Redirect returns to `checkout.html?order_id={order_id}`
-6. Frontend calls `/api/cashfree/verify-payment`
-7. On `PAID`, order is stored in localStorage and cart is cleared
+Current API base is in:
+
+- `docs/script.js`
+- `docs/admin-dashboard.js`
+
+Both point to:
+
+```txt
+https://podsentra.onrender.com/api
+```
+
+## Admin Dashboard Features
+
+`docs/admin-dashboard.html` includes:
+
+- admin login (env-based credentials via backend)
+- overview metrics (products, successful checkouts, revenue, active carts, abandoned carts)
+- product CRUD
+- orders list
+- active carts list
+- abandoned carts list
+
+## Implemented API Endpoints
+
+### Public
+
+- `GET /api/health`
+- `GET /api/products`
+- `POST /api/cart/session`
+- `PUT /api/cart/session/:id`
+- `POST /api/cashfree/create-order`
+- `POST /api/cashfree/verify-payment`
+
+### Admin (JWT protected)
+
+- `POST /api/admin/login`
+- `GET /api/admin/me`
+- `POST /api/admin/products`
+- `PUT /api/admin/products/:id`
+- `DELETE /api/admin/products/:id`
+- `GET /api/admin/orders`
+- `GET /api/admin/carts`
+- `GET /api/admin/abandoned-carts`
+- `GET /api/admin/dashboard`
+
+## Cart and Checkout Tracking
+
+- cart updates sync to backend sessions
+- sessions inactive for 30+ minutes are marked abandoned
+- successful payments mark sessions completed
+- successful payment records are persisted as backend orders
+
+## Notes
+
+- Keep valid Cashfree sandbox keys in Render for test payments.
+- Ensure `CLIENT_URL` includes your real frontend origin to avoid CORS errors.
+- Legacy `docs/admin.html` is preserved and points users to the new admin dashboard.

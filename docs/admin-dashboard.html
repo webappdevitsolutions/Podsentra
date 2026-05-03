@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Podsecntra | Admin Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="admin-dashboard">
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="index.html">Podsecntra</a>
+      <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">Menu</button>
+      <nav class="nav-links" id="nav-links">
+        <a href="index.html">Home</a>
+        <a href="products.html">Products</a>
+        <a href="admin-dashboard.html">Admin</a>
+        <a href="login.html">Login</a>
+      </nav>
+      <div class="nav-actions">
+        <div id="nav-user" class="nav-user"></div>
+        <a class="cart-link" href="cart.html">Cart <span id="cart-count">0</span></a>
+      </div>
+    </div>
+  </header>
+
+  <main class="section">
+    <div class="container">
+      <div id="admin-login-panel" class="auth-panel admin-login-panel">
+        <h1>Podsecntra Admin Login</h1>
+        <p class="soft-text">Use ADMIN_EMAIL and ADMIN_PASSWORD configured on Render.</p>
+        <p id="admin-login-message" class="status-msg"></p>
+        <form id="admin-login-form">
+          <label>Email</label>
+          <input type="email" id="admin-email" required>
+          <label>Password</label>
+          <input type="password" id="admin-password" required>
+          <button class="btn btn-primary" type="submit" id="admin-login-btn">Login</button>
+        </form>
+      </div>
+
+      <div id="admin-app" class="admin-dashboard hidden">
+        <aside class="admin-sidebar card">
+          <h2>Podsecntra</h2>
+          <p class="soft-text">Admin Console</p>
+          <button class="btn btn-light admin-nav-btn active" data-admin-view="overview">Overview</button>
+          <button class="btn btn-light admin-nav-btn" data-admin-view="products">Products</button>
+          <button class="btn btn-light admin-nav-btn" data-admin-view="orders">Orders</button>
+          <button class="btn btn-light admin-nav-btn" data-admin-view="carts">Active Carts</button>
+          <button class="btn btn-light admin-nav-btn" data-admin-view="abandoned">Abandoned Carts</button>
+          <button class="btn btn-danger" id="admin-logout-btn" type="button">Logout</button>
+        </aside>
+
+        <section class="admin-content">
+          <div id="admin-global-message" class="status-msg"></div>
+
+          <div class="admin-view" data-admin-panel="overview">
+            <h1>Dashboard Overview</h1>
+            <div class="metrics-grid">
+              <article class="card metric-card">
+                <h3>Total Products</h3>
+                <p id="metric-products" class="metric-value">0</p>
+              </article>
+              <article class="card metric-card">
+                <h3>Successful Checkouts</h3>
+                <p id="metric-checkouts" class="metric-value">0</p>
+              </article>
+              <article class="card metric-card">
+                <h3>Total Revenue</h3>
+                <p id="metric-revenue" class="metric-value">Rs 0.00</p>
+              </article>
+              <article class="card metric-card">
+                <h3>Active Carts</h3>
+                <p id="metric-active-carts" class="metric-value">0</p>
+              </article>
+              <article class="card metric-card">
+                <h3>Abandoned Carts</h3>
+                <p id="metric-abandoned-carts" class="metric-value">0</p>
+              </article>
+            </div>
+
+            <div class="admin-grid-two">
+              <article class="card">
+                <h2>Recent Checkout Sessions</h2>
+                <div id="overview-recent-orders"></div>
+              </article>
+              <article class="card">
+                <h2>Recent Abandoned Sessions</h2>
+                <div id="overview-recent-abandoned"></div>
+              </article>
+            </div>
+          </div>
+
+          <div class="admin-view hidden" data-admin-panel="products">
+            <h1>Product Management</h1>
+            <div class="admin-grid">
+              <article class="card">
+                <h2 id="admin-form-title">Add Product</h2>
+                <form id="admin-product-form">
+                  <input type="hidden" id="admin-product-id">
+                  <label>Name</label>
+                  <input type="text" id="admin-name" required>
+                  <label>Category</label>
+                  <input type="text" id="admin-category" required>
+                  <label>Price</label>
+                  <input type="number" id="admin-price" min="1" step="0.01" required>
+                  <label>Stock</label>
+                  <input type="number" id="admin-stock" min="0" step="1" required>
+                  <label>Rating (1 to 5)</label>
+                  <input type="number" id="admin-rating" min="1" max="5" step="0.1" required>
+                  <label>Image URL</label>
+                  <input type="url" id="admin-image" required>
+                  <label>Description</label>
+                  <textarea id="admin-description" rows="4" required></textarea>
+                  <div class="btn-row">
+                    <button class="btn btn-primary" type="submit" id="admin-save-btn">Save Product</button>
+                    <button class="btn btn-light" type="button" id="admin-cancel-btn">Cancel</button>
+                  </div>
+                </form>
+              </article>
+
+              <article class="card">
+                <h2>Products</h2>
+                <div id="admin-products-list"></div>
+              </article>
+            </div>
+          </div>
+
+          <div class="admin-view hidden" data-admin-panel="orders">
+            <h1>Orders</h1>
+            <div id="admin-orders-list" class="card"></div>
+          </div>
+
+          <div class="admin-view hidden" data-admin-panel="carts">
+            <h1>Active Cart Sessions</h1>
+            <div id="admin-carts-list" class="card"></div>
+          </div>
+
+          <div class="admin-view hidden" data-admin-panel="abandoned">
+            <h1>Abandoned Cart Sessions</h1>
+            <div id="admin-abandoned-list" class="card"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>Podsecntra powered by HTML, CSS, JavaScript, Express, Supabase, and Cashfree Payments.</p>
+    </div>
+  </footer>
+
+  <script src="admin-dashboard.js"></script>
+</body>
+</html>

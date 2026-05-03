@@ -1,18 +1,20 @@
 const API_BASE = "https://podsentra.onrender.com/api";
 const CASHFREE_MODE = window.STORE_CASHFREE_MODE || "sandbox";
+const STORE_NAME = "Podsecntra";
 
 const STORAGE_KEYS = {
-  products: "store_products",
-  cart: "store_cart_local",
-  users: "store_users",
-  currentUser: "store_current_user",
-  orders: "store_orders",
-  pendingOrder: "store_pending_order"
+  cart: "podsecntra_cart_local",
+  users: "podsecntra_users",
+  currentUser: "podsecntra_current_user",
+  pendingOrder: "podsecntra_pending_order",
+  orderHistory: "podsecntra_order_history",
+  cartSessionId: "podsecntra_cart_session_id",
+  cartSessionDbId: "podsecntra_cart_session_db_id"
 };
 
-const defaultProducts = [
+const fallbackProducts = [
   {
-    id: 101,
+    id: "fallback-101",
     name: "Classic White Sneakers",
     category: "Footwear",
     price: 79.99,
@@ -22,7 +24,7 @@ const defaultProducts = [
     description: "Clean low-top sneakers with cushioned insole for all-day comfort."
   },
   {
-    id: 102,
+    id: "fallback-102",
     name: "Minimal Leather Backpack",
     category: "Accessories",
     price: 119.99,
@@ -32,7 +34,7 @@ const defaultProducts = [
     description: "Structured backpack with laptop sleeve and water-resistant lining."
   },
   {
-    id: 103,
+    id: "fallback-103",
     name: "Linen Blend Shirt",
     category: "Apparel",
     price: 49.5,
@@ -42,7 +44,7 @@ const defaultProducts = [
     description: "Breathable shirt with relaxed fit, perfect for warm weather."
   },
   {
-    id: 104,
+    id: "fallback-104",
     name: "Ceramic Table Lamp",
     category: "Home",
     price: 64.25,
@@ -50,34 +52,24 @@ const defaultProducts = [
     stock: 14,
     image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80",
     description: "Modern lamp with warm ambient glow and matte ceramic base."
-  },
-  {
-    id: 105,
-    name: "Sport Chronograph Watch",
-    category: "Accessories",
-    price: 149.99,
-    rating: 4.8,
-    stock: 8,
-    image: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=900&q=80",
-    description: "Bold timepiece with stainless steel case and durable strap."
-  },
-  {
-    id: 106,
-    name: "Soft Knit Hoodie",
-    category: "Apparel",
-    price: 59.99,
-    rating: 4.2,
-    stock: 22,
-    image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80",
-    description: "Comfort hoodie with a clean silhouette and brushed inner lining."
   }
 ];
+
+const state = {
+  products: [],
+  productsLoaded: false,
+  cartSyncInFlight: false,
+  cartSessionId: null,
+  cartSessionDbId: null
+};
 
 document.addEventListener("DOMContentLoaded", async () => {
   initializeStore();
   setupNavigation();
   updateCartCount();
   renderNavUser();
+
+  await loadProductsFromApi();
 
   const page = document.body.dataset.page;
   if (page === "home") renderHome();
@@ -87,13 +79,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (page === "checkout") await renderCheckoutPage();
   if (page === "login") renderAuthPage();
   if (page === "admin") renderAdminPage();
+
+  await syncCartSession().catch(() => {});
 });
 
 function initializeStore() {
-  if (!localStorage.getItem(STORAGE_KEYS.products)) {
-    localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(defaultProducts));
-  }
-
   if (!localStorage.getItem(STORAGE_KEYS.cart)) {
     localStorage.setItem(STORAGE_KEYS.cart, JSON.stringify([]));
   }
@@ -103,19 +93,48 @@ function initializeStore() {
       STORAGE_KEYS.users,
       JSON.stringify([
         {
-          id: "admin_local",
-          name: "Store Admin",
-          email: "admin@store.com",
-          password: "admin12345",
-          isAdmin: true
+          id: `user_${Date.now()}`,
+          name: "Demo User",
+          email: "demo@podsecntra.com",
+          password: "demo12345",
+          isAdmin: false
         }
       ])
     );
   }
 
-  if (!localStorage.getItem(STORAGE_KEYS.orders)) {
-    localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify([]));
+  if (!localStorage.getItem(STORAGE_KEYS.orderHistory)) {
+    localStorage.setItem(STORAGE_KEYS.orderHistory, JSON.stringify([]));
   }
+
+  state.cartSessionId = localStorage.getItem(STORAGE_KEYS.cartSessionId) || `session_${cryptoRandomId()}`;
+  state.cartSessionDbId = localStorage.getItem(STORAGE_KEYS.cartSessionDbId) || null;
+  localStorage.setItem(STORAGE_KEYS.cartSessionId, state.cartSessionId);
+}
+
+async function loadProductsFromApi() {
+  try {
+    const response = await apiFetch("/products");
+    state.products = (response.products || []).map(normalizeProduct);
+    state.productsLoaded = true;
+  } catch (error) {
+    console.warn("Using fallback products because API fetch failed:", error.message);
+    state.products = fallbackProducts.map(normalizeProduct);
+    state.productsLoaded = true;
+  }
+}
+
+function normalizeProduct(raw = {}) {
+  return {
+    id: raw.id,
+    name: String(raw.name || "Untitled Product"),
+    category: String(raw.category || "General"),
+    price: Number(raw.price || 0),
+    rating: Number(raw.rating || 4.5),
+    stock: Math.max(0, Number(raw.stock || 0)),
+    image: String(raw.image || "https://images.unsplash.com/photo-1560393464-5c69a73c5770?auto=format&fit=crop&w=900&q=80"),
+    description: String(raw.description || "")
+  };
 }
 
 function setupNavigation() {
@@ -159,11 +178,7 @@ function renderNavUser() {
 }
 
 function getProducts() {
-  return readJSON(STORAGE_KEYS.products, []);
-}
-
-function saveProducts(products) {
-  localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(products));
+  return state.products;
 }
 
 function getCart() {
@@ -190,55 +205,60 @@ function setCurrentUser(user) {
   localStorage.setItem(STORAGE_KEYS.currentUser, JSON.stringify(user));
 }
 
-function getOrders() {
-  return readJSON(STORAGE_KEYS.orders, []);
+function getOrderHistory() {
+  return readJSON(STORAGE_KEYS.orderHistory, []);
 }
 
-function saveOrders(orders) {
-  localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
+function saveOrderHistory(orders) {
+  localStorage.setItem(STORAGE_KEYS.orderHistory, JSON.stringify(orders));
 }
 
 function updateCartCount() {
   const badge = document.getElementById("cart-count");
   if (!badge) return;
-
-  const count = getCart().reduce((sum, item) => sum + item.quantity, 0);
+  const count = getCart().reduce((sum, item) => sum + Number(item.quantity || 0), 0);
   badge.textContent = String(count);
+}
+
+function findProductById(productId) {
+  return getProducts().find((item) => String(item.id) === String(productId));
 }
 
 function addToCart(productId, quantity = 1) {
   const cart = getCart();
-  const product = getProducts().find((item) => item.id === productId);
+  const product = findProductById(productId);
   if (!product) {
     return { ok: false, message: "Product not found." };
   }
 
-  const existing = cart.find((item) => item.productId === productId);
-  const currentQty = existing ? existing.quantity : 0;
-  if (currentQty + quantity > product.stock) {
+  const existing = cart.find((item) => String(item.productId) === String(productId));
+  const currentQty = existing ? Number(existing.quantity || 0) : 0;
+  if (currentQty + quantity > Number(product.stock || 0)) {
     return { ok: false, message: `Only ${product.stock} units available` };
   }
 
   if (existing) {
     existing.quantity += quantity;
   } else {
-    cart.push({ productId, quantity });
+    cart.push({ productId: product.id, quantity });
   }
 
   saveCart(cart);
   updateCartCount();
+  syncCartSession().catch(() => {});
   return { ok: true };
 }
 
 function removeFromCart(productId) {
-  saveCart(getCart().filter((item) => item.productId !== productId));
+  saveCart(getCart().filter((item) => String(item.productId) !== String(productId)));
   updateCartCount();
+  syncCartSession().catch(() => {});
 }
 
 function setCartQuantity(productId, quantity) {
   const cart = getCart();
-  const product = getProducts().find((item) => item.id === productId);
-  const target = cart.find((item) => item.productId === productId);
+  const product = findProductById(productId);
+  const target = cart.find((item) => String(item.productId) === String(productId));
   if (!target || !product) return;
 
   if (quantity <= 0) {
@@ -246,9 +266,10 @@ function setCartQuantity(productId, quantity) {
     return;
   }
 
-  target.quantity = Math.min(quantity, product.stock);
+  target.quantity = Math.min(quantity, Number(product.stock || 0));
   saveCart(cart);
   updateCartCount();
+  syncCartSession().catch(() => {});
 }
 
 function renderProductCards(products, mount) {
@@ -256,26 +277,26 @@ function renderProductCards(products, mount) {
     .map(
       (product) => `
       <article class="product-card">
-        <a href="product-details.html?id=${product.id}">
-          <img src="${product.image}" alt="${escapeHTML(product.name)}">
+        <a href="product-details.html?id=${encodeURIComponent(product.id)}">
+          <img src="${escapeHTML(product.image)}" alt="${escapeHTML(product.name)}">
         </a>
         <div class="product-body">
           <p class="category-pill">${escapeHTML(product.category)}</p>
           <h3 class="product-title">
-            <a href="product-details.html?id=${product.id}">${escapeHTML(product.name)}</a>
+            <a href="product-details.html?id=${encodeURIComponent(product.id)}">${escapeHTML(product.name)}</a>
           </h3>
           <div class="meta-row">
             <span class="price">${formatPrice(product.price)}</span>
             <span class="rating">${Number(product.rating).toFixed(1)} / 5</span>
           </div>
           <div class="meta-row">
-            <span class="soft-text">Stock: ${product.stock}</span>
+            <span class="soft-text">Stock: ${Number(product.stock || 0)}</span>
           </div>
           <div class="btn-row">
-            <button class="btn btn-primary" data-cart-add="${product.id}" type="button" ${
-              product.stock <= 0 ? "disabled" : ""
-            }>${product.stock <= 0 ? "Out of Stock" : "Add to Cart"}</button>
-            <a class="btn btn-light" href="product-details.html?id=${product.id}">Details</a>
+            <button class="btn btn-primary" data-cart-add="${escapeHTML(product.id)}" type="button" ${
+              Number(product.stock || 0) <= 0 ? "disabled" : ""
+            }>${Number(product.stock || 0) <= 0 ? "Out of Stock" : "Add to Cart"}</button>
+            <a class="btn btn-light" href="product-details.html?id=${encodeURIComponent(product.id)}">Details</a>
           </div>
         </div>
       </article>
@@ -287,7 +308,7 @@ function renderProductCards(products, mount) {
 function attachCardEvents(scope = document) {
   scope.querySelectorAll("[data-cart-add]").forEach((button) => {
     button.addEventListener("click", () => {
-      const result = addToCart(Number(button.dataset.cartAdd), 1);
+      const result = addToCart(button.dataset.cartAdd, 1);
       button.textContent = result.ok ? "Added" : result.message;
       setTimeout(() => {
         button.textContent = "Add to Cart";
@@ -312,6 +333,7 @@ function renderProductsPage() {
 
   const products = getProducts();
   const categories = [...new Set(products.map((item) => item.category))];
+  categoryFilter.innerHTML = '<option value="all">All Categories</option>';
   categoryFilter.innerHTML += categories
     .map((category) => `<option value="${escapeHTML(category)}">${escapeHTML(category)}</option>`)
     .join("");
@@ -342,8 +364,8 @@ function renderProductDetailsPage() {
   if (!mount) return;
 
   const params = new URLSearchParams(window.location.search);
-  const productId = Number(params.get("id"));
-  const product = getProducts().find((item) => item.id === productId);
+  const productId = params.get("id");
+  const product = findProductById(productId);
 
   if (!product) {
     mount.innerHTML =
@@ -353,14 +375,14 @@ function renderProductDetailsPage() {
 
   mount.innerHTML = `
     <section class="product-detail">
-      <img src="${product.image}" alt="${escapeHTML(product.name)}">
+      <img src="${escapeHTML(product.image)}" alt="${escapeHTML(product.name)}">
       <div>
         <p class="category-pill">${escapeHTML(product.category)}</p>
         <h1>${escapeHTML(product.name)}</h1>
         <p class="rating">Rating: ${Number(product.rating).toFixed(1)} / 5</p>
         <h2 class="price">${formatPrice(product.price)}</h2>
         <p class="soft-text">${escapeHTML(product.description)}</p>
-        <p class="soft-text">Stock available: ${product.stock}</p>
+        <p class="soft-text">Stock available: ${Number(product.stock || 0)}</p>
         <div class="btn-row">
           <div class="qty-control">
             <button type="button" id="detail-decrease">-</button>
@@ -368,8 +390,8 @@ function renderProductDetailsPage() {
             <button type="button" id="detail-increase">+</button>
           </div>
           <button id="detail-add" class="btn btn-primary" type="button" ${
-            product.stock <= 0 ? "disabled" : ""
-          }>${product.stock <= 0 ? "Out of Stock" : "Add to Cart"}</button>
+            Number(product.stock || 0) <= 0 ? "disabled" : ""
+          }>${Number(product.stock || 0) <= 0 ? "Out of Stock" : "Add to Cart"}</button>
         </div>
       </div>
     </section>
@@ -381,7 +403,7 @@ function renderProductDetailsPage() {
   const addBtn = document.getElementById("detail-add");
 
   increaseBtn.addEventListener("click", () => {
-    quantityInput.value = String(Math.min(product.stock, Number(quantityInput.value || 1) + 1));
+    quantityInput.value = String(Math.min(Number(product.stock || 0), Number(quantityInput.value || 1) + 1));
   });
 
   decreaseBtn.addEventListener("click", () => {
@@ -398,17 +420,17 @@ function renderProductDetailsPage() {
 }
 
 function getCartDetails() {
-  const productsMap = new Map(getProducts().map((product) => [product.id, product]));
+  const productsMap = new Map(getProducts().map((product) => [String(product.id), product]));
   const items = getCart()
     .map((entry) => {
-      const product = productsMap.get(entry.productId);
+      const product = productsMap.get(String(entry.productId));
       if (!product) return null;
-      const quantity = Math.min(entry.quantity, product.stock);
+      const quantity = Math.min(Number(entry.quantity || 0), Number(product.stock || 0));
       if (quantity <= 0) return null;
       return {
         ...product,
         quantity,
-        lineTotal: Number((product.price * quantity).toFixed(2))
+        lineTotal: Number((Number(product.price) * quantity).toFixed(2))
       };
     })
     .filter(Boolean);
@@ -417,6 +439,60 @@ function getCartDetails() {
     items,
     subtotal: Number(items.reduce((sum, item) => sum + item.lineTotal, 0).toFixed(2))
   };
+}
+
+function serializeCartItems(items = []) {
+  return items.map((item) => ({
+    productId: item.id,
+    name: item.name,
+    category: item.category,
+    price: Number(item.price),
+    quantity: Number(item.quantity),
+    lineTotal: Number(item.lineTotal)
+  }));
+}
+
+async function syncCartSession(customerOverrides = {}, status = "active") {
+  if (state.cartSyncInFlight) return null;
+  state.cartSyncInFlight = true;
+
+  try {
+    const currentUser = getCurrentUser();
+    const { items, subtotal } = getCartDetails();
+
+    const payload = {
+      sessionId: state.cartSessionId,
+      status,
+      items: serializeCartItems(items),
+      totalAmount: subtotal,
+      customerName: customerOverrides.name || currentUser?.name || "",
+      customerEmail: customerOverrides.email || currentUser?.email || "",
+      customerPhone: customerOverrides.phone || "",
+      orderId: customerOverrides.orderId || null,
+      paymentSessionId: customerOverrides.paymentSessionId || null
+    };
+
+    const response = await apiFetch("/cart/session", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    if (response.session) {
+      state.cartSessionId = response.session.session_id || state.cartSessionId;
+      state.cartSessionDbId = response.session.id || state.cartSessionDbId;
+      localStorage.setItem(STORAGE_KEYS.cartSessionId, state.cartSessionId);
+      if (state.cartSessionDbId) {
+        localStorage.setItem(STORAGE_KEYS.cartSessionDbId, state.cartSessionDbId);
+      }
+    }
+
+    return response.session || null;
+  } catch (error) {
+    console.warn("Cart sync failed:", error.message);
+    return null;
+  } finally {
+    state.cartSyncInFlight = false;
+  }
 }
 
 function renderCartPage() {
@@ -436,18 +512,18 @@ function renderCartPage() {
         .map(
           (item) => `
           <div class="cart-row">
-            <img src="${item.image}" alt="${escapeHTML(item.name)}">
+            <img src="${escapeHTML(item.image)}" alt="${escapeHTML(item.name)}">
             <div>
               <p class="cart-title">${escapeHTML(item.name)}</p>
               <p class="rating">${formatPrice(item.price)} each | Stock: ${item.stock}</p>
             </div>
             <div class="qty-control">
-              <button type="button" data-qty-dec="${item.id}">-</button>
+              <button type="button" data-qty-dec="${escapeHTML(item.id)}">-</button>
               <input type="number" value="${item.quantity}" readonly>
-              <button type="button" data-qty-inc="${item.id}">+</button>
+              <button type="button" data-qty-inc="${escapeHTML(item.id)}">+</button>
             </div>
             <strong>${formatPrice(item.lineTotal)}</strong>
-            <button class="btn btn-danger btn-small" data-remove="${item.id}" type="button">Remove</button>
+            <button class="btn btn-danger btn-small" data-remove="${escapeHTML(item.id)}" type="button">Remove</button>
           </div>
         `
         )
@@ -461,15 +537,15 @@ function renderCartPage() {
 
   mount.querySelectorAll("[data-remove]").forEach((button) => {
     button.addEventListener("click", () => {
-      removeFromCart(Number(button.dataset.remove));
+      removeFromCart(button.dataset.remove);
       renderCartPage();
     });
   });
 
   mount.querySelectorAll("[data-qty-inc]").forEach((button) => {
     button.addEventListener("click", () => {
-      const id = Number(button.dataset.qtyInc);
-      const item = items.find((row) => row.id === id);
+      const id = button.dataset.qtyInc;
+      const item = items.find((row) => String(row.id) === String(id));
       if (!item) return;
       setCartQuantity(id, item.quantity + 1);
       renderCartPage();
@@ -478,8 +554,8 @@ function renderCartPage() {
 
   mount.querySelectorAll("[data-qty-dec]").forEach((button) => {
     button.addEventListener("click", () => {
-      const id = Number(button.dataset.qtyDec);
-      const item = items.find((row) => row.id === id);
+      const id = button.dataset.qtyDec;
+      const item = items.find((row) => String(row.id) === String(id));
       if (!item) return;
       setCartQuantity(id, item.quantity - 1);
       renderCartPage();
@@ -564,29 +640,39 @@ async function renderCheckoutPage() {
     setLoading(submitBtn, true, "Creating order...");
     checkoutMsg.textContent = "";
 
+    const customer = {
+      name: document.getElementById("checkout-fullname").value.trim(),
+      email: document.getElementById("checkout-email").value.trim(),
+      phone: document.getElementById("checkout-phone").value.trim(),
+      address: document.getElementById("checkout-address").value.trim(),
+      city: document.getElementById("checkout-city").value.trim(),
+      zip: document.getElementById("checkout-zip").value.trim()
+    };
+
     const pendingOrder = {
-      items,
+      items: serializeCartItems(items),
       total: subtotal,
-      customer: {
-        name: document.getElementById("checkout-fullname").value.trim(),
-        email: document.getElementById("checkout-email").value.trim(),
-        phone: document.getElementById("checkout-phone").value.trim(),
-        address: document.getElementById("checkout-address").value.trim(),
-        city: document.getElementById("checkout-city").value.trim(),
-        zip: document.getElementById("checkout-zip").value.trim()
-      },
+      customer,
+      cartSessionId: state.cartSessionId,
       createdAt: new Date().toISOString()
     };
 
     try {
+      await syncCartSession(customer, "active");
+
       const response = await apiFetch("/cashfree/create-order", {
         method: "POST",
         body: JSON.stringify({
           orderAmount: subtotal,
-          customerName: pendingOrder.customer.name,
-          customerEmail: pendingOrder.customer.email,
-          customerPhone: pendingOrder.customer.phone,
-          orderNote: `Store order with ${items.length} item(s)`,
+          customerName: customer.name,
+          customerEmail: customer.email,
+          customerPhone: customer.phone,
+          customerAddress: customer.address,
+          customerCity: customer.city,
+          customerZip: customer.zip,
+          items: pendingOrder.items,
+          cartSessionId: state.cartSessionId,
+          orderNote: `${STORE_NAME} order with ${items.length} item(s)`,
           returnUrl: `${window.location.origin}${window.location.pathname}?order_id={order_id}`
         })
       });
@@ -596,7 +682,8 @@ async function renderCheckoutPage() {
         JSON.stringify({
           ...pendingOrder,
           orderId: response.orderId,
-          cfOrderId: response.cfOrderId
+          cfOrderId: response.cfOrderId,
+          paymentSessionId: response.paymentSessionId
         })
       );
 
@@ -610,25 +697,47 @@ async function renderCheckoutPage() {
 
 async function verifyReturnedCashfreeOrder(mount, orderId) {
   try {
+    const pendingOrder = readJSON(STORAGE_KEYS.pendingOrder, null);
+
     const result = await apiFetch("/cashfree/verify-payment", {
       method: "POST",
-      body: JSON.stringify({ orderId })
+      body: JSON.stringify({
+        orderId,
+        cartSessionId: state.cartSessionId,
+        customerName: pendingOrder?.customer?.name || "",
+        customerEmail: pendingOrder?.customer?.email || "",
+        customerPhone: pendingOrder?.customer?.phone || "",
+        customerAddress: pendingOrder?.customer?.address || "",
+        customerCity: pendingOrder?.customer?.city || "",
+        customerZip: pendingOrder?.customer?.zip || "",
+        items: pendingOrder?.items || [],
+        amount: pendingOrder?.total || 0
+      })
     });
 
-    const pendingOrder = readJSON(STORAGE_KEYS.pendingOrder, null);
     const paid = result.orderStatus === "PAID";
 
     if (paid && pendingOrder && pendingOrder.orderId === orderId) {
-      const orders = getOrders();
-      orders.unshift({
+      const orderHistory = getOrderHistory();
+      orderHistory.unshift({
         ...pendingOrder,
         paymentStatus: result.orderStatus,
         verifiedAt: new Date().toISOString()
       });
-      saveOrders(orders);
+      saveOrderHistory(orderHistory);
       localStorage.removeItem(STORAGE_KEYS.pendingOrder);
       saveCart([]);
       updateCartCount();
+      await syncCartSession(
+        {
+          name: pendingOrder.customer?.name,
+          email: pendingOrder.customer?.email,
+          phone: pendingOrder.customer?.phone,
+          orderId,
+          paymentSessionId: result.paymentSessionId
+        },
+        "completed"
+      );
     }
 
     mount.innerHTML = paid
@@ -732,7 +841,7 @@ function renderAuthPage() {
     authMessage.textContent = "Login successful. Redirecting...";
     renderNavUser();
     setTimeout(() => {
-      location.href = user.isAdmin ? "admin.html" : "index.html";
+      location.href = "index.html";
     }, 800);
   });
 }
@@ -741,123 +850,16 @@ function renderAdminPage() {
   const authMsg = document.getElementById("admin-auth-message");
   const form = document.getElementById("admin-product-form");
   const listMount = document.getElementById("admin-products-list");
-  const title = document.getElementById("admin-form-title");
-  const cancelBtn = document.getElementById("admin-cancel-btn");
-  const uploadBtn = document.getElementById("admin-upload-btn");
-  const imageFileInput = document.getElementById("admin-image-file");
-  if (!authMsg || !form || !listMount || !title || !cancelBtn || !uploadBtn || !imageFileInput) return;
+  if (!authMsg || !form || !listMount) return;
 
-  const currentUser = getCurrentUser();
-  if (!currentUser || !currentUser.isAdmin) {
-    authMsg.textContent = "Admin login required. Use admin@store.com / admin12345.";
-    form.classList.add("hidden");
-    listMount.innerHTML = '<p class="empty-state">No access.</p>';
-    return;
-  }
-
-  authMsg.textContent = `Logged in as admin: ${currentUser.email}`;
-  uploadBtn.disabled = true;
-  imageFileInput.disabled = true;
-  uploadBtn.textContent = "Upload disabled";
-  uploadBtn.addEventListener("click", () => {
-    authMsg.textContent = "Image upload is disabled in the simplified localStorage mode. Use an image URL.";
-  });
-
-  const idInput = document.getElementById("admin-product-id");
-  const nameInput = document.getElementById("admin-name");
-  const categoryInput = document.getElementById("admin-category");
-  const priceInput = document.getElementById("admin-price");
-  const stockInput = document.getElementById("admin-stock");
-  const ratingInput = document.getElementById("admin-rating");
-  const imageInput = document.getElementById("admin-image");
-  const descriptionInput = document.getElementById("admin-description");
-
-  const resetForm = () => {
-    form.reset();
-    idInput.value = "";
-    title.textContent = "Add Product";
-  };
-
-  const renderAdminProducts = () => {
-    const products = getProducts();
-    listMount.innerHTML = products
-      .map(
-        (product) => `
-        <article class="admin-item">
-          <img src="${product.image}" alt="${escapeHTML(product.name)}">
-          <div>
-            <strong>${escapeHTML(product.name)}</strong>
-            <p class="soft-text">${escapeHTML(product.category)} | ${formatPrice(product.price)} | Stock: ${product.stock}</p>
-          </div>
-          <div class="btn-row">
-            <button class="btn btn-light btn-small" data-edit-id="${product.id}" type="button">Edit</button>
-            <button class="btn btn-danger btn-small" data-delete-id="${product.id}" type="button">Delete</button>
-          </div>
-        </article>
-      `
-      )
-      .join("");
-
-    listMount.querySelectorAll("[data-edit-id]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const product = getProducts().find((entry) => entry.id === Number(button.dataset.editId));
-        if (!product) return;
-        idInput.value = String(product.id);
-        nameInput.value = product.name;
-        categoryInput.value = product.category;
-        priceInput.value = String(product.price);
-        stockInput.value = String(product.stock);
-        ratingInput.value = String(product.rating);
-        imageInput.value = product.image;
-        descriptionInput.value = product.description;
-        title.textContent = "Edit Product";
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
-    });
-
-    listMount.querySelectorAll("[data-delete-id]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const id = Number(button.dataset.deleteId);
-        saveProducts(getProducts().filter((entry) => entry.id !== id));
-        saveCart(getCart().filter((item) => item.productId !== id));
-        updateCartCount();
-        renderAdminProducts();
-      });
-    });
-  };
-
-  cancelBtn.addEventListener("click", resetForm);
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-
-    const id = Number(idInput.value);
-    const products = getProducts();
-    const product = {
-      id: id || Date.now(),
-      name: nameInput.value.trim(),
-      category: categoryInput.value.trim(),
-      price: Number(priceInput.value),
-      stock: Number(stockInput.value),
-      rating: Number(ratingInput.value),
-      image: imageInput.value.trim(),
-      description: descriptionInput.value.trim()
-    };
-
-    const index = products.findIndex((entry) => entry.id === id);
-    if (index >= 0) {
-      products[index] = product;
-    } else {
-      products.unshift(product);
-    }
-
-    saveProducts(products);
-    authMsg.textContent = id ? "Product updated successfully." : "Product created successfully.";
-    resetForm();
-    renderAdminProducts();
-  });
-
-  renderAdminProducts();
+  authMsg.textContent = "Podsecntra admin has moved to the new dashboard.";
+  form.classList.add("hidden");
+  listMount.innerHTML = `
+    <div class="empty-state">
+      <p>Open the new admin dashboard for products, orders, carts, and analytics.</p>
+      <p><a class="btn btn-primary" href="admin-dashboard.html">Go to Admin Dashboard</a></p>
+    </div>
+  `;
 }
 
 async function apiFetch(path, options = {}) {
@@ -926,12 +928,17 @@ function readJSON(key, fallback) {
   }
 }
 
+function cryptoRandomId() {
+  const values = new Uint32Array(2);
+  window.crypto.getRandomValues(values);
+  return `${Date.now()}_${values[0].toString(16)}${values[1].toString(16)}`;
+}
+
 function escapeHTML(value) {
   return String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
