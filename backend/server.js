@@ -159,8 +159,8 @@ app.post("/api/cashfree/verify-payment", async (req, res) => {
   }
 });
 
-const frontendPath = path.join(__dirname, "..", "frontend");
-app.use(express.static(frontendPath));
+const docsPath = path.join(__dirname, "..", "docs");
+app.use(express.static(docsPath));
 
 app.use((err, _req, res, _next) => {
   res.status(err.statusCode || 500).json({

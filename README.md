@@ -9,7 +9,7 @@ No Supabase. No MongoDB. No UI rebuild.
 
 ## Project Structure
 
-- `frontend/` static multi-page store
+- `docs/` static multi-page store
 - `backend/` Cashfree API backend
 - `render.yaml` backend deployment blueprint
 - `netlify.toml` frontend deployment config
@@ -47,7 +47,7 @@ http://localhost:5000/api/health
 ### Frontend
 
 ```powershell
-cd "C:\Users\ashis\Desktop\New folder\frontend"
+cd "C:\Users\ashis\Desktop\New folder\docs"
 python -m http.server 5500
 ```
 
@@ -81,10 +81,10 @@ https://your-render-backend.onrender.com/api/health
 ## Deploy Frontend to Netlify
 
 1. Create Netlify site from this same repo.
-2. Publish directory should be `frontend` (`netlify.toml` already sets this).
+2. Publish directory should be `docs` (`netlify.toml` already sets this).
 3. After Render deploy, update:
 
-- `frontend/script.js` default production API URL placeholder
+- `docs/script.js` default production API URL placeholder
 - `netlify.toml` redirect target URL placeholder
 
 to your real Render URL, then redeploy Netlify.
