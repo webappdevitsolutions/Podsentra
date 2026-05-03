@@ -83,20 +83,59 @@ function renderCartCount() {
 function bindUiEvents() {
   document.getElementById("admin-login-form")?.addEventListener("submit", handleLogin);
   document.getElementById("admin-logout-btn")?.addEventListener("click", logoutAdmin);
+  document.getElementById("open-product-modal-btn")?.addEventListener("click", () => {
+    resetProductForm({ closeModal: false });
+    openProductModal();
+  });
+  document.getElementById("product-modal-close")?.addEventListener("click", closeProductModal);
+  document.getElementById("product-modal")?.addEventListener("click", (event) => {
+    if (event.target.id === "product-modal") {
+      closeProductModal();
+    }
+  });
 
   document.querySelectorAll(".admin-nav-btn").forEach((button) => {
     button.addEventListener("click", () => switchAdminView(button.dataset.adminView));
   });
 
   document.getElementById("admin-product-form")?.addEventListener("submit", handleProductSave);
-  document.getElementById("admin-cancel-btn")?.addEventListener("click", resetProductForm);
+  document.getElementById("admin-cancel-btn")?.addEventListener("click", () => resetProductForm());
   document.getElementById("admin-image-upload-btn")?.addEventListener("click", handleImageUpload);
   document.getElementById("admin-image-file")?.addEventListener("change", handleImagePreview);
+  document.getElementById("admin-image-replace-btn")?.addEventListener("click", () => {
+    const input = document.getElementById("admin-image-file");
+    if (!input) return;
+    input.value = "";
+    input.click();
+  });
+
+  const dropzone = document.getElementById("image-dropzone");
+  if (dropzone) {
+    dropzone.addEventListener("click", () => document.getElementById("admin-image-file")?.click());
+    dropzone.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        document.getElementById("admin-image-file")?.click();
+      }
+    });
+    dropzone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      dropzone.classList.add("drag-over");
+    });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag-over"));
+    dropzone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      dropzone.classList.remove("drag-over");
+      const file = event.dataTransfer?.files?.[0];
+      if (!file || !file.type.startsWith("image/")) return;
+      setSelectedImageFile(file);
+      previewImage(file);
+      setImageUploadStatus("Preview ready. Click Upload Image.");
+    });
+  }
 
   document.getElementById("product-search")?.addEventListener("input", (event) => {
-    state.productFilters.search = event.target.value.trim().toLowerCase();
-    state.productFilters.page = 1;
-    renderProducts();
+    debouncedProductSearch(event.target.value);
   });
 
   document.getElementById("product-category-filter")?.addEventListener("change", (event) => {
@@ -228,10 +267,8 @@ async function loadDashboard() {
 
 function renderCharts() {
   const recentOrders = state.dashboard?.recentCheckouts || [];
-  const recentAbandoned = state.dashboard?.recentAbandonedCarts || [];
-
   const revenuePoints = aggregateByDate(recentOrders, (item) => Number(item.amount || 0));
-  const abandonPoints = aggregateByDate(recentAbandoned, () => 1);
+  const ordersPoints = aggregateByDate(recentOrders, () => 1);
 
   drawBarChart("revenue-chart", {
     labels: revenuePoints.labels,
@@ -240,12 +277,10 @@ function renderCharts() {
     valuePrefix: "Rs "
   });
 
-  drawDualBarChart("cart-chart", {
-    labels: ["Active", "Abandoned"],
-    valuesA: [Number(state.dashboard?.metrics?.activeCarts || 0)],
-    valuesB: [Number(state.dashboard?.metrics?.abandonedCarts || 0)],
-    colorA: "#0f766e",
-    colorB: "#f59e0b"
+  drawLineChart("orders-chart", {
+    labels: ordersPoints.labels,
+    values: ordersPoints.values,
+    color: "#1d4ed8"
   });
 }
 
@@ -297,7 +332,7 @@ function drawBarChart(canvasId, config) {
   });
 }
 
-function drawDualBarChart(canvasId, config) {
+function drawLineChart(canvasId, config) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
@@ -305,31 +340,52 @@ function drawDualBarChart(canvasId, config) {
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
 
-  const active = Number(config.valuesA[0] || 0);
-  const abandoned = Number(config.valuesB[0] || 0);
-  const max = Math.max(active, abandoned, 1);
-  const baseY = height - 30;
-  const barMaxHeight = height - 60;
+  const labels = config.labels || [];
+  const values = config.values || [];
+  const max = Math.max(...values, 1);
+  const min = 0;
+  const chartPadding = { top: 20, right: 20, bottom: 28, left: 24 };
+  const chartWidth = width - chartPadding.left - chartPadding.right;
+  const chartHeight = height - chartPadding.top - chartPadding.bottom;
 
-  const bars = [
-    { label: "Active", value: active, color: config.colorA || "#0f766e", x: width * 0.25 },
-    { label: "Abandoned", value: abandoned, color: config.colorB || "#f59e0b", x: width * 0.6 }
-  ];
+  ctx.strokeStyle = "#d8e4ea";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(chartPadding.left, height - chartPadding.bottom);
+  ctx.lineTo(width - chartPadding.right, height - chartPadding.bottom);
+  ctx.stroke();
 
-  bars.forEach((bar) => {
-    const h = (bar.value / max) * barMaxHeight;
-    const y = baseY - h;
-    const w = 80;
+  if (!values.length) return;
+  const step = labels.length > 1 ? chartWidth / (labels.length - 1) : 0;
+  const points = values.map((value, index) => {
+    const x = chartPadding.left + step * index;
+    const y =
+      chartPadding.top +
+      chartHeight -
+      ((Number(value) - min) / Math.max(max - min, 1)) * chartHeight;
+    return { x, y, value, label: labels[index] || "" };
+  });
 
-    ctx.fillStyle = bar.color;
-    ctx.fillRect(bar.x, y, w, h);
+  ctx.strokeStyle = config.color || "#1d4ed8";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    if (index === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  });
+  ctx.stroke();
 
-    ctx.fillStyle = "#19211f";
-    ctx.font = "12px Manrope";
-    ctx.fillText(String(bar.value), bar.x + 28, Math.max(14, y - 6));
+  ctx.fillStyle = config.color || "#1d4ed8";
+  points.forEach((point) => {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  });
 
-    ctx.fillStyle = "#5d6d68";
-    ctx.fillText(bar.label, bar.x + 16, baseY + 16);
+  ctx.fillStyle = "#5d6d68";
+  ctx.font = "11px Manrope";
+  points.forEach((point) => {
+    ctx.fillText(point.label, point.x - 12, height - 8);
   });
 }
 
@@ -440,7 +496,7 @@ function renderProducts() {
     .map(
       (product) => `
       <article class="admin-item ${String(product.id) === String(document.getElementById("admin-product-id")?.value || "") ? "admin-item-active" : ""}">
-        <img src="${escapeHTML(product.image_url)}" alt="${escapeHTML(product.name)}">
+        <img src="${escapeHTML(product.image_url)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">
         <div>
           <strong>${escapeHTML(product.name)}</strong>
           <p class="soft-text">
@@ -512,6 +568,7 @@ function handleImagePreview(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   previewImage(file);
+  setImageUploadStatus("Preview ready. Click Upload Image.");
 }
 
 function previewImage(file) {
@@ -523,8 +580,22 @@ function previewImage(file) {
   reader.onload = () => {
     preview.src = String(reader.result || "");
     previewWrap.classList.remove("hidden");
+    document.getElementById("image-dropzone")?.classList.add("has-image");
   };
   reader.readAsDataURL(file);
+}
+
+function setImageUploadStatus(message) {
+  const status = document.getElementById("admin-image-upload-status");
+  if (status) status.textContent = message || "";
+}
+
+function setSelectedImageFile(file) {
+  const fileInput = document.getElementById("admin-image-file");
+  if (!fileInput || !file) return;
+  const transfer = new DataTransfer();
+  transfer.items.add(file);
+  fileInput.files = transfer.files;
 }
 
 async function handleImageUpload() {
@@ -540,7 +611,7 @@ async function handleImageUpload() {
   }
 
   setLoading(uploadBtn, true, "Uploading...");
-  if (status) status.textContent = "Uploading image...";
+  setImageUploadStatus("Uploading image...");
 
   try {
     const dataUrl = await fileToDataUrl(file);
@@ -598,22 +669,25 @@ function populateProductForm(productId) {
   if (previewWrap && preview && product.image_url) {
     preview.src = product.image_url;
     previewWrap.classList.remove("hidden");
+    document.getElementById("image-dropzone")?.classList.add("has-image");
   }
 
   renderProducts();
   switchAdminView("products");
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  openProductModal();
 }
 
-function resetProductForm() {
+function resetProductForm(options = {}) {
+  const { closeModal = true } = options;
   document.getElementById("admin-product-form")?.reset();
   document.getElementById("admin-product-id").value = "";
   document.getElementById("admin-form-title").textContent = "Add Product";
   const previewWrap = document.getElementById("admin-image-preview-wrap");
   if (previewWrap) previewWrap.classList.add("hidden");
-  const status = document.getElementById("admin-image-upload-status");
-  if (status) status.textContent = "";
+  document.getElementById("image-dropzone")?.classList.remove("has-image");
+  setImageUploadStatus("");
   renderProducts();
+  if (closeModal) closeProductModal();
 }
 
 async function handleProductSave(event) {
@@ -776,6 +850,14 @@ function openOrderModal(order) {
 
 function closeOrderModal() {
   document.getElementById("order-details-modal")?.classList.add("hidden");
+}
+
+function openProductModal() {
+  document.getElementById("product-modal")?.classList.remove("hidden");
+}
+
+function closeProductModal() {
+  document.getElementById("product-modal")?.classList.add("hidden");
 }
 
 async function loadActiveCarts() {
@@ -971,5 +1053,19 @@ function escapeHTML(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+const debouncedProductSearch = debounce((value) => {
+  state.productFilters.search = String(value || "").trim().toLowerCase();
+  state.productFilters.page = 1;
+  renderProducts();
+}, 250);
+
+function debounce(fn, delayMs = 250) {
+  let timerId = null;
+  return (...args) => {
+    clearTimeout(timerId);
+    timerId = setTimeout(() => fn(...args), delayMs);
+  };
 }
 

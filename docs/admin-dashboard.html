@@ -79,8 +79,8 @@
                 <canvas id="revenue-chart" height="180"></canvas>
               </article>
               <article class="card">
-                <h2>Cart Funnel</h2>
-                <canvas id="cart-chart" height="180"></canvas>
+                <h2>Orders Trend</h2>
+                <canvas id="orders-chart" height="180"></canvas>
               </article>
             </div>
 
@@ -99,6 +99,7 @@
           <div class="admin-view hidden" data-admin-panel="products">
             <div class="section-head">
               <h1>Products Management</h1>
+              <button class="btn btn-primary" type="button" id="open-product-modal-btn">Add Product</button>
             </div>
             <div class="card">
               <div class="admin-controls">
@@ -109,48 +110,10 @@
               </div>
             </div>
 
-            <div class="admin-grid">
-              <article class="card">
-                <h2 id="admin-form-title">Add Product</h2>
-                <form id="admin-product-form">
-                  <input type="hidden" id="admin-product-id">
-                  <label>Name</label>
-                  <input type="text" id="admin-name" required>
-                  <label>Category</label>
-                  <input type="text" id="admin-category" required>
-                  <label>Price</label>
-                  <input type="number" id="admin-price" min="1" step="0.01" required>
-                  <label>Compare-at Price</label>
-                  <input type="number" id="admin-compare-price" min="0" step="0.01" placeholder="Optional">
-                  <label>Stock</label>
-                  <input type="number" id="admin-stock" min="0" step="1" required>
-                  <label>Rating (1 to 5)</label>
-                  <input type="number" id="admin-rating" min="1" max="5" step="0.1" required>
-                  <label>Image URL (auto after upload)</label>
-                  <input type="url" id="admin-image" readonly required>
-                  <label>Or Upload Image</label>
-                  <input type="file" id="admin-image-file" accept="image/*">
-                  <div class="btn-row">
-                    <button class="btn btn-light" type="button" id="admin-image-upload-btn">Upload Image</button>
-                    <span id="admin-image-upload-status" class="soft-text"></span>
-                  </div>
-                  <div class="image-preview-wrap hidden" id="admin-image-preview-wrap">
-                    <img id="admin-image-preview" alt="Preview">
-                  </div>
-                  <label>Description</label>
-                  <textarea id="admin-description" rows="4" required></textarea>
-                  <div class="btn-row">
-                    <button class="btn btn-primary" type="submit" id="admin-save-btn">Save Product</button>
-                    <button class="btn btn-light" type="button" id="admin-cancel-btn">Cancel</button>
-                  </div>
-                </form>
-              </article>
-
-              <article class="card">
-                <h2>Products</h2>
-                <div id="admin-products-list"></div>
-                <div id="products-pagination" class="pagination-row"></div>
-              </article>
+            <div class="card">
+              <h2>Products</h2>
+              <div id="admin-products-list"></div>
+              <div id="products-pagination" class="pagination-row"></div>
             </div>
           </div>
 
@@ -235,6 +198,76 @@
         <button class="btn btn-light btn-small" type="button" id="order-modal-close">Close</button>
       </div>
       <div id="order-details-content"></div>
+    </div>
+  </div>
+
+  <div id="product-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="admin-form-title">
+    <div class="modal-card card product-modal-card">
+      <div class="modal-header">
+        <h2 id="admin-form-title">Add Product</h2>
+        <button class="btn btn-light btn-small" type="button" id="product-modal-close">Close</button>
+      </div>
+      <form id="admin-product-form">
+        <input type="hidden" id="admin-product-id">
+
+        <section class="form-section-card">
+          <h3>Basic Info</h3>
+          <label>Name</label>
+          <input type="text" id="admin-name" required>
+          <label>Description</label>
+          <textarea id="admin-description" rows="4" required></textarea>
+          <label>Category</label>
+          <input type="text" id="admin-category" required>
+        </section>
+
+        <section class="form-section-card">
+          <h3>Pricing</h3>
+          <div class="form-grid-two">
+            <div>
+              <label>Price</label>
+              <input type="number" id="admin-price" min="1" step="0.01" required>
+            </div>
+            <div>
+              <label>Compare-at Price</label>
+              <input type="number" id="admin-compare-price" min="0" step="0.01" placeholder="Optional">
+            </div>
+          </div>
+          <label>Rating (1 to 5)</label>
+          <input type="number" id="admin-rating" min="1" max="5" step="0.1" required>
+        </section>
+
+        <section class="form-section-card">
+          <h3>Inventory</h3>
+          <label>Stock</label>
+          <input type="number" id="admin-stock" min="0" step="1" required>
+        </section>
+
+        <section class="form-section-card">
+          <h3>Media</h3>
+          <label>Image URL (auto after upload)</label>
+          <input type="url" id="admin-image" readonly required>
+
+          <input type="file" id="admin-image-file" accept="image/*" class="hidden">
+          <div id="image-dropzone" class="image-dropzone" tabindex="0" role="button" aria-label="Upload product image">
+            <p><strong>Drag and drop product image</strong></p>
+            <p class="soft-text">or click to browse files</p>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-light" type="button" id="admin-image-upload-btn">Upload Image</button>
+            <button class="btn btn-light" type="button" id="admin-image-replace-btn">Replace Image</button>
+            <span id="admin-image-upload-status" class="soft-text"></span>
+          </div>
+          <div class="image-preview-wrap hidden" id="admin-image-preview-wrap">
+            <img id="admin-image-preview" alt="Preview">
+          </div>
+        </section>
+
+        <div class="btn-row form-actions">
+          <button class="btn btn-primary" type="submit" id="admin-save-btn">Save Product</button>
+          <button class="btn btn-light" type="button" id="admin-cancel-btn">Cancel</button>
+        </div>
+      </form>
     </div>
   </div>
 

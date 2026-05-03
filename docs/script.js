@@ -283,7 +283,7 @@ function renderProductCards(products, mount) {
       (product) => `
       <article class="product-card">
         <a href="product-details.html?id=${encodeURIComponent(product.id)}">
-          <img src="${escapeHTML(product.image)}" alt="${escapeHTML(product.name)}">
+          <img src="${escapeHTML(product.image)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">
         </a>
         <div class="product-body">
           <p class="category-pill">${escapeHTML(product.category)}</p>
@@ -359,7 +359,7 @@ function renderProductsPage() {
     emptyState.classList.toggle("hidden", filtered.length > 0);
   };
 
-  searchInput.addEventListener("input", applyFilters);
+  searchInput.addEventListener("input", debounce(applyFilters, 250));
   categoryFilter.addEventListener("change", applyFilters);
   applyFilters();
 }
@@ -380,7 +380,7 @@ function renderProductDetailsPage() {
 
   mount.innerHTML = `
     <section class="product-detail">
-      <img src="${escapeHTML(product.image)}" alt="${escapeHTML(product.name)}">
+      <img src="${escapeHTML(product.image)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">
       <div>
         <p class="category-pill">${escapeHTML(product.category)}</p>
         <h1>${escapeHTML(product.name)}</h1>
@@ -517,7 +517,7 @@ function renderCartPage() {
         .map(
           (item) => `
           <div class="cart-row">
-            <img src="${escapeHTML(item.image)}" alt="${escapeHTML(item.name)}">
+            <img src="${escapeHTML(item.image)}" alt="${escapeHTML(item.name)}" loading="lazy" decoding="async">
             <div>
               <p class="cart-title">${escapeHTML(item.name)}</p>
               <p class="rating">${formatPrice(item.price)} each | Stock: ${item.stock}</p>
@@ -935,9 +935,17 @@ function renderPricePair(price, compareAtPrice) {
     <span class="price-stack">
       ${base}
       <span class="compare-price">${formatPrice(compareAtPrice)}</span>
-      <span class="discount-badge">${discount}% off</span>
+      <span class="discount-badge">${discount}% OFF</span>
     </span>
   `;
+}
+
+function debounce(fn, delayMs = 250) {
+  let timerId = null;
+  return (...args) => {
+    clearTimeout(timerId);
+    timerId = setTimeout(() => fn(...args), delayMs);
+  };
 }
 
 function readJSON(key, fallback) {
