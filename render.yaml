@@ -21,6 +21,8 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: product-images
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD

@@ -16,6 +16,7 @@ const CASHFREE_BASE_URL =
     ? "https://api.cashfree.com/pg"
     : "https://sandbox.cashfree.com/pg";
 const CASHFREE_API_VERSION = "2023-08-01";
+const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "product-images";
 const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || "podsecntra_admin_secret_change_me";
 const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || "admin@podsecntra.com").toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "change_me";
@@ -109,7 +110,7 @@ app.use(
     }
   })
 );
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 function numberOrZero(value) {
   const parsed = Number(value);
@@ -191,6 +192,24 @@ function sanitizeProductPayload(body = {}) {
     image: String(body.image || "").trim(),
     rating: Math.min(5, Math.max(1, numberOrZero(body.rating || 4.5)))
   };
+}
+
+function sanitizeFileName(name = "upload") {
+  return String(name)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function parseDataUrl(dataUrl = "") {
+  const match = String(dataUrl).match(/^data:(.+?);base64,(.+)$/);
+  if (!match) {
+    return null;
+  }
+  const mimeType = match[1];
+  const base64Data = match[2];
+  return { mimeType, base64Data };
 }
 
 function formatSessionPayload(body = {}) {
@@ -288,6 +307,64 @@ app.post("/api/admin/products", requireDb, requireAdminAuth, async (req, res) =>
     return res.status(201).json({ success: true, product: data });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || "Unable to create product." });
+  }
+});
+
+app.post("/api/admin/upload-image", requireDb, requireAdminAuth, async (req, res) => {
+  try {
+    const { fileName, dataUrl } = req.body || {};
+    const parsed = parseDataUrl(dataUrl);
+
+    if (!parsed) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid image payload. Send a valid base64 data URL."
+      });
+    }
+
+    const { mimeType, base64Data } = parsed;
+    if (!/^image\//i.test(mimeType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only image uploads are allowed."
+      });
+    }
+
+    const fileBuffer = Buffer.from(base64Data, "base64");
+    if (!fileBuffer.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Uploaded image is empty."
+      });
+    }
+
+    const extensionFromMime = mimeType.split("/")[1] || "png";
+    const safeName = sanitizeFileName(fileName || `product_${Date.now()}.${extensionFromMime}`);
+    const storagePath = `products/${Date.now()}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, fileBuffer, {
+        contentType: mimeType,
+        upsert: false,
+        cacheControl: "3600"
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { data: publicData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+    return res.status(201).json({
+      success: true,
+      imageUrl: publicData?.publicUrl || null,
+      path: storagePath
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Unable to upload image."
+    });
   }
 });
 

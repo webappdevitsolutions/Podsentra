@@ -135,6 +135,7 @@ https://podsentra.onrender.com/api
 - `GET /api/admin/carts`
 - `GET /api/admin/abandoned-carts`
 - `GET /api/admin/dashboard`
+- `POST /api/admin/upload-image`
 
 ## Cart and Checkout Tracking
 
@@ -148,3 +149,4 @@ https://podsentra.onrender.com/api
 - Keep valid Cashfree sandbox keys in Render for test payments.
 - Ensure `CLIENT_URL` includes your real frontend origin to avoid CORS errors.
 - Legacy `docs/admin.html` is preserved and points users to the new admin dashboard.
+- Create a Supabase Storage bucket named `product-images` (or set `SUPABASE_STORAGE_BUCKET`).

@@ -28,7 +28,7 @@
     <div class="container">
       <div id="admin-login-panel" class="auth-panel admin-login-panel">
         <h1>Podsecntra Admin Login</h1>
-        <p class="soft-text">Use ADMIN_EMAIL and ADMIN_PASSWORD configured on Render.</p>
+        <p class="soft-text">Use ADMIN_EMAIL and ADMIN_PASSWORD from backend environment.</p>
         <p id="admin-login-message" class="status-msg"></p>
         <form id="admin-login-form">
           <label>Email</label>
@@ -52,22 +52,16 @@
         </aside>
 
         <section class="admin-content">
-          <div id="admin-global-message" class="status-msg"></div>
-
           <div class="admin-view" data-admin-panel="overview">
             <h1>Dashboard Overview</h1>
             <div class="metrics-grid">
               <article class="card metric-card">
-                <h3>Total Products</h3>
-                <p id="metric-products" class="metric-value">0</p>
-              </article>
-              <article class="card metric-card">
-                <h3>Successful Checkouts</h3>
-                <p id="metric-checkouts" class="metric-value">0</p>
-              </article>
-              <article class="card metric-card">
                 <h3>Total Revenue</h3>
                 <p id="metric-revenue" class="metric-value">Rs 0.00</p>
+              </article>
+              <article class="card metric-card">
+                <h3>Total Orders</h3>
+                <p id="metric-orders" class="metric-value">0</p>
               </article>
               <article class="card metric-card">
                 <h3>Active Carts</h3>
@@ -76,6 +70,17 @@
               <article class="card metric-card">
                 <h3>Abandoned Carts</h3>
                 <p id="metric-abandoned-carts" class="metric-value">0</p>
+              </article>
+            </div>
+
+            <div class="admin-grid-two">
+              <article class="card">
+                <h2>Revenue Trend (Recent Orders)</h2>
+                <canvas id="revenue-chart" height="180"></canvas>
+              </article>
+              <article class="card">
+                <h2>Cart Funnel</h2>
+                <canvas id="cart-chart" height="180"></canvas>
               </article>
             </div>
 
@@ -92,7 +97,18 @@
           </div>
 
           <div class="admin-view hidden" data-admin-panel="products">
-            <h1>Product Management</h1>
+            <div class="section-head">
+              <h1>Products Management</h1>
+            </div>
+            <div class="card">
+              <div class="admin-controls">
+                <input type="text" id="product-search" placeholder="Search products by name/description">
+                <select id="product-category-filter">
+                  <option value="all">All Categories</option>
+                </select>
+              </div>
+            </div>
+
             <div class="admin-grid">
               <article class="card">
                 <h2 id="admin-form-title">Add Product</h2>
@@ -110,6 +126,15 @@
                   <input type="number" id="admin-rating" min="1" max="5" step="0.1" required>
                   <label>Image URL</label>
                   <input type="url" id="admin-image" required>
+                  <label>Or Upload Image</label>
+                  <input type="file" id="admin-image-file" accept="image/*">
+                  <div class="btn-row">
+                    <button class="btn btn-light" type="button" id="admin-image-upload-btn">Upload Image</button>
+                    <span id="admin-image-upload-status" class="soft-text"></span>
+                  </div>
+                  <div class="image-preview-wrap hidden" id="admin-image-preview-wrap">
+                    <img id="admin-image-preview" alt="Preview">
+                  </div>
                   <label>Description</label>
                   <textarea id="admin-description" rows="4" required></textarea>
                   <div class="btn-row">
@@ -122,28 +147,101 @@
               <article class="card">
                 <h2>Products</h2>
                 <div id="admin-products-list"></div>
+                <div id="products-pagination" class="pagination-row"></div>
               </article>
             </div>
           </div>
 
           <div class="admin-view hidden" data-admin-panel="orders">
-            <h1>Orders</h1>
-            <div id="admin-orders-list" class="card"></div>
+            <h1>Orders Management</h1>
+            <div class="card">
+              <div class="admin-controls orders-controls">
+                <select id="orders-status-filter">
+                  <option value="all">All Statuses</option>
+                  <option value="PAID">Success</option>
+                  <option value="ACTIVE">Pending</option>
+                  <option value="FAILED">Failed</option>
+                </select>
+                <input type="date" id="orders-date-from">
+                <input type="date" id="orders-date-to">
+              </div>
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Customer Email</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-orders-tbody"></tbody>
+                </table>
+              </div>
+              <div id="orders-empty" class="empty-state hidden">No orders match your filters.</div>
+            </div>
           </div>
 
           <div class="admin-view hidden" data-admin-panel="carts">
-            <h1>Active Cart Sessions</h1>
-            <div id="admin-carts-list" class="card"></div>
+            <h1>Active Carts</h1>
+            <div class="card table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Session ID</th>
+                    <th>Items Count</th>
+                    <th>Total</th>
+                    <th>Last Activity</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-carts-tbody"></tbody>
+              </table>
+              <div id="active-carts-empty" class="empty-state hidden">No active carts.</div>
+            </div>
           </div>
 
           <div class="admin-view hidden" data-admin-panel="abandoned">
-            <h1>Abandoned Cart Sessions</h1>
-            <div id="admin-abandoned-list" class="card"></div>
+            <h1>Abandoned Carts</h1>
+            <div class="card table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Session ID</th>
+                    <th>Products</th>
+                    <th>Total</th>
+                    <th>Last Activity</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-abandoned-tbody"></tbody>
+              </table>
+              <div id="abandoned-carts-empty" class="empty-state hidden">No abandoned carts.</div>
+            </div>
           </div>
         </section>
       </div>
     </div>
   </main>
+
+  <div id="order-details-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="order-details-title">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h2 id="order-details-title">Order Details</h2>
+        <button class="btn btn-light btn-small" type="button" id="order-modal-close">Close</button>
+      </div>
+      <div id="order-details-content"></div>
+    </div>
+  </div>
+
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+    <p>Loading...</p>
+  </div>
+
+  <div id="toast-root" class="toast-root"></div>
 
   <footer class="site-footer">
     <div class="container">
