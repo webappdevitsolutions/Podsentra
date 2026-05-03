@@ -694,6 +694,7 @@ async function handleProductSave(event) {
   event.preventDefault();
 
   const id = document.getElementById("admin-product-id").value;
+  const uploadedImageUrl = document.getElementById("admin-image").value.trim();
   const payload = {
     name: document.getElementById("admin-name").value.trim(),
     category: document.getElementById("admin-category").value.trim(),
@@ -703,7 +704,8 @@ async function handleProductSave(event) {
       : null,
     stock: Number(document.getElementById("admin-stock").value),
     rating: Number(document.getElementById("admin-rating").value),
-    image_url: document.getElementById("admin-image").value.trim(),
+    image_url: uploadedImageUrl,
+    image: uploadedImageUrl,
     description: document.getElementById("admin-description").value.trim()
   };
 
@@ -711,6 +713,9 @@ async function handleProductSave(event) {
     showToast("Please upload a product image first", "error");
     return;
   }
+
+  console.log("[Podsecntra Admin] Saving product image URL:", payload.image_url);
+  showToast(`Image URL ready: ${payload.image_url}`, "success");
 
   const saveBtn = document.getElementById("admin-save-btn");
   setLoading(saveBtn, true, id ? "Updating..." : "Creating...");

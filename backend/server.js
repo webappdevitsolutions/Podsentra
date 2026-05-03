@@ -207,6 +207,15 @@ function sanitizeProductPayload(body = {}) {
   };
 }
 
+function normalizeProductRecord(row = {}) {
+  const resolvedImageUrl = String(row.image_url || row.image || "").trim();
+  return {
+    ...row,
+    image_url: resolvedImageUrl,
+    image: resolvedImageUrl
+  };
+}
+
 function sanitizeFileName(name = "upload") {
   return String(name)
     .toLowerCase()
@@ -299,7 +308,10 @@ app.get("/api/products", requireDb, async (_req, res) => {
       throw new Error(error.message);
     }
 
-    return res.json({ success: true, products: data || [] });
+    return res.json({
+      success: true,
+      products: (data || []).map(normalizeProductRecord)
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || "Unable to load products." });
   }
@@ -317,7 +329,7 @@ app.post("/api/admin/products", requireDb, requireAdminAuth, async (req, res) =>
       throw new Error(error.message);
     }
 
-    return res.status(201).json({ success: true, product: data });
+    return res.status(201).json({ success: true, product: normalizeProductRecord(data) });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || "Unable to create product." });
   }
@@ -384,6 +396,9 @@ app.post("/api/admin/upload-image", requireDb, requireAdminAuth, async (req, res
 app.put("/api/admin/products/:id", requireDb, requireAdminAuth, async (req, res) => {
   try {
     const updates = sanitizeProductPayload(req.body);
+    if (!updates.image_url) {
+      return res.status(400).json({ success: false, message: "Product image URL is required." });
+    }
     const { data, error } = await supabase
       .from("products")
       .update(updates)
@@ -398,7 +413,7 @@ app.put("/api/admin/products/:id", requireDb, requireAdminAuth, async (req, res)
       return res.status(404).json({ success: false, message: "Product not found." });
     }
 
-    return res.json({ success: true, product: data });
+    return res.json({ success: true, product: normalizeProductRecord(data) });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || "Unable to update product." });
   }

@@ -1,6 +1,8 @@
 const API_BASE = "https://podsentra.onrender.com/api";
 const CASHFREE_MODE = window.STORE_CASHFREE_MODE || "sandbox";
 const STORE_NAME = "Podsecntra";
+const FALLBACK_PRODUCT_IMAGE =
+  "https://images.unsplash.com/photo-1560393464-5c69a73c5770?auto=format&fit=crop&w=900&q=80";
 
 const STORAGE_KEYS = {
   cart: "podsecntra_cart_local",
@@ -129,6 +131,7 @@ function normalizeProduct(raw = {}) {
     raw.compare_at_price === null || raw.compare_at_price === undefined || raw.compare_at_price === ""
       ? null
       : Number(raw.compare_at_price);
+  const resolvedImage = resolveProductImage(raw);
   return {
     id: raw.id,
     name: String(raw.name || "Untitled Product"),
@@ -137,9 +140,14 @@ function normalizeProduct(raw = {}) {
     compare_at_price: comparePrice && comparePrice > Number(raw.price || 0) ? comparePrice : null,
     rating: Number(raw.rating || 4.5),
     stock: Math.max(0, Number(raw.stock || 0)),
-    image: String(raw.image_url || raw.image || "https://images.unsplash.com/photo-1560393464-5c69a73c5770?auto=format&fit=crop&w=900&q=80"),
+    image_url: resolvedImage,
+    image: resolvedImage,
     description: String(raw.description || "")
   };
+}
+
+function resolveProductImage(product = {}) {
+  return String(product.image_url || product.image || FALLBACK_PRODUCT_IMAGE);
 }
 
 function setupNavigation() {
@@ -283,7 +291,7 @@ function renderProductCards(products, mount) {
       (product) => `
       <article class="product-card">
         <a href="product-details.html?id=${encodeURIComponent(product.id)}">
-          <img src="${escapeHTML(product.image)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">
+          <img src="${escapeHTML(resolveProductImage(product))}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">
         </a>
         <div class="product-body">
           <p class="category-pill">${escapeHTML(product.category)}</p>
@@ -380,7 +388,7 @@ function renderProductDetailsPage() {
 
   mount.innerHTML = `
     <section class="product-detail">
-      <img src="${escapeHTML(product.image)}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">
+      <img src="${escapeHTML(resolveProductImage(product))}" alt="${escapeHTML(product.name)}" loading="lazy" decoding="async">
       <div>
         <p class="category-pill">${escapeHTML(product.category)}</p>
         <h1>${escapeHTML(product.name)}</h1>
@@ -517,7 +525,7 @@ function renderCartPage() {
         .map(
           (item) => `
           <div class="cart-row">
-            <img src="${escapeHTML(item.image)}" alt="${escapeHTML(item.name)}" loading="lazy" decoding="async">
+            <img src="${escapeHTML(resolveProductImage(item))}" alt="${escapeHTML(item.name)}" loading="lazy" decoding="async">
             <div>
               <p class="cart-title">${escapeHTML(item.name)}</p>
               <p class="rating">${formatPrice(item.price)} each | Stock: ${item.stock}</p>
