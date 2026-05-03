@@ -125,14 +125,19 @@ async function loadProductsFromApi() {
 }
 
 function normalizeProduct(raw = {}) {
+  const comparePrice =
+    raw.compare_at_price === null || raw.compare_at_price === undefined || raw.compare_at_price === ""
+      ? null
+      : Number(raw.compare_at_price);
   return {
     id: raw.id,
     name: String(raw.name || "Untitled Product"),
     category: String(raw.category || "General"),
     price: Number(raw.price || 0),
+    compare_at_price: comparePrice && comparePrice > Number(raw.price || 0) ? comparePrice : null,
     rating: Number(raw.rating || 4.5),
     stock: Math.max(0, Number(raw.stock || 0)),
-    image: String(raw.image || "https://images.unsplash.com/photo-1560393464-5c69a73c5770?auto=format&fit=crop&w=900&q=80"),
+    image: String(raw.image_url || raw.image || "https://images.unsplash.com/photo-1560393464-5c69a73c5770?auto=format&fit=crop&w=900&q=80"),
     description: String(raw.description || "")
   };
 }
@@ -286,7 +291,7 @@ function renderProductCards(products, mount) {
             <a href="product-details.html?id=${encodeURIComponent(product.id)}">${escapeHTML(product.name)}</a>
           </h3>
           <div class="meta-row">
-            <span class="price">${formatPrice(product.price)}</span>
+            ${renderPricePair(product.price, product.compare_at_price)}
             <span class="rating">${Number(product.rating).toFixed(1)} / 5</span>
           </div>
           <div class="meta-row">
@@ -380,7 +385,7 @@ function renderProductDetailsPage() {
         <p class="category-pill">${escapeHTML(product.category)}</p>
         <h1>${escapeHTML(product.name)}</h1>
         <p class="rating">Rating: ${Number(product.rating).toFixed(1)} / 5</p>
-        <h2 class="price">${formatPrice(product.price)}</h2>
+        <h2 class="price-row">${renderPricePair(product.price, product.compare_at_price)}</h2>
         <p class="soft-text">${escapeHTML(product.description)}</p>
         <p class="soft-text">Stock available: ${Number(product.stock || 0)}</p>
         <div class="btn-row">
@@ -917,6 +922,22 @@ function setLoading(button, isLoading, loadingText) {
 
 function formatPrice(value) {
   return `Rs ${Number(value).toFixed(2)}`;
+}
+
+function renderPricePair(price, compareAtPrice) {
+  const base = `<span class="price">${formatPrice(price)}</span>`;
+  if (!compareAtPrice || Number(compareAtPrice) <= Number(price)) {
+    return base;
+  }
+
+  const discount = Math.round(((Number(compareAtPrice) - Number(price)) / Number(compareAtPrice)) * 100);
+  return `
+    <span class="price-stack">
+      ${base}
+      <span class="compare-price">${formatPrice(compareAtPrice)}</span>
+      <span class="discount-badge">${discount}% off</span>
+    </span>
+  `;
 }
 
 function readJSON(key, fallback) {

@@ -26,54 +26,60 @@ const defaultProducts = [
     name: "Classic White Sneakers",
     category: "Footwear",
     price: 79.99,
+    compare_at_price: 99.99,
     rating: 4.6,
     stock: 18,
-    image: "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=900&q=80",
+    image_url: "https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=900&q=80",
     description: "Clean low-top sneakers with cushioned insole for all-day comfort."
   },
   {
     name: "Minimal Leather Backpack",
     category: "Accessories",
     price: 119.99,
+    compare_at_price: 149.99,
     rating: 4.7,
     stock: 9,
-    image: "https://images.unsplash.com/photo-1491637639811-60e2756cc1c7?auto=format&fit=crop&w=900&q=80",
+    image_url: "https://images.unsplash.com/photo-1491637639811-60e2756cc1c7?auto=format&fit=crop&w=900&q=80",
     description: "Structured backpack with laptop sleeve and water-resistant lining."
   },
   {
     name: "Linen Blend Shirt",
     category: "Apparel",
     price: 49.5,
+    compare_at_price: 69.5,
     rating: 4.3,
     stock: 30,
-    image: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
+    image_url: "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80",
     description: "Breathable shirt with relaxed fit, perfect for warm weather."
   },
   {
     name: "Ceramic Table Lamp",
     category: "Home",
     price: 64.25,
+    compare_at_price: 79.25,
     rating: 4.4,
     stock: 14,
-    image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80",
+    image_url: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80",
     description: "Modern lamp with warm ambient glow and matte ceramic base."
   },
   {
     name: "Sport Chronograph Watch",
     category: "Accessories",
     price: 149.99,
+    compare_at_price: 179.99,
     rating: 4.8,
     stock: 8,
-    image: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=900&q=80",
+    image_url: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=900&q=80",
     description: "Bold timepiece with stainless steel case and durable strap."
   },
   {
     name: "Soft Knit Hoodie",
     category: "Apparel",
     price: 59.99,
+    compare_at_price: 79.99,
     rating: 4.2,
     stock: 22,
-    image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80",
+    image_url: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80",
     description: "Comfort hoodie with a clean silhouette and brushed inner lining."
   }
 ];
@@ -183,13 +189,20 @@ async function markAbandonedSessions() {
 }
 
 function sanitizeProductPayload(body = {}) {
+  const price = numberOrZero(body.price);
+  const compareAtInput = body.compare_at_price ?? body.compareAtPrice ?? null;
+  const compareAtPrice = compareAtInput === "" || compareAtInput === null ? null : numberOrZero(compareAtInput);
+  const imageUrl = String(body.image_url || body.image || "").trim();
+
   return {
     name: String(body.name || "").trim(),
     category: String(body.category || "").trim(),
-    price: numberOrZero(body.price),
+    price,
+    compare_at_price: compareAtPrice && compareAtPrice > price ? compareAtPrice : null,
     stock: Math.max(0, Math.trunc(numberOrZero(body.stock))),
     description: String(body.description || "").trim(),
-    image: String(body.image || "").trim(),
+    image_url: imageUrl,
+    image: imageUrl,
     rating: Math.min(5, Math.max(1, numberOrZero(body.rating || 4.5)))
   };
 }
@@ -295,7 +308,7 @@ app.get("/api/products", requireDb, async (_req, res) => {
 app.post("/api/admin/products", requireDb, requireAdminAuth, async (req, res) => {
   try {
     const product = sanitizeProductPayload(req.body);
-    if (!product.name || !product.category || !product.image || !product.description || product.price <= 0) {
+    if (!product.name || !product.category || !product.image_url || !product.description || product.price <= 0) {
       return res.status(400).json({ success: false, message: "All product fields are required." });
     }
 

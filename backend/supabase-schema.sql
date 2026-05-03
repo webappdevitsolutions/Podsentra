@@ -7,13 +7,27 @@ create table if not exists public.products (
   name text not null,
   category text not null,
   price numeric(10,2) not null default 0,
+  compare_at_price numeric(10,2),
   stock integer not null default 0,
-  image text not null,
+  image_url text not null,
+  image text,
   description text not null,
   rating numeric(3,2) not null default 4.5,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.products
+  add column if not exists compare_at_price numeric(10,2),
+  add column if not exists image_url text,
+  add column if not exists image text;
+
+update public.products
+set image_url = coalesce(image_url, image)
+where image_url is null;
+
+alter table public.products
+  alter column image_url set not null;
 
 create table if not exists public.cart_sessions (
   id uuid primary key default gen_random_uuid(),

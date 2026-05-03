@@ -253,6 +253,38 @@ a {
   font-weight: 800;
 }
 
+.price-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.compare-price {
+  color: #94a3b8;
+  text-decoration: line-through;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.discount-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.price-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .rating {
   color: var(--muted);
   font-size: 0.9rem;
